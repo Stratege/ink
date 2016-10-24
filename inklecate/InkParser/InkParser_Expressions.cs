@@ -26,11 +26,11 @@ namespace Ink
 
         protected Parsed.Object TempDeclarationOrAssignment()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             bool isNewDeclaration = ParseTempKeyword();
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             string varName = null;
             if (isNewDeclaration) {
@@ -43,7 +43,7 @@ namespace Ink
                 return null;
             }
 
-            Whitespace();
+            IgnoredWhitespace();
 
             // Optional assignment
             Expression assignedExpression = null;
@@ -73,7 +73,7 @@ namespace Ink
             var ruleId = BeginRule ();
 
             if (Parse (Identifier) == "temp") {
-                SucceedRule (ruleId);
+                SucceedRule<object> (ruleId);
                 return true;
             } else {
                 FailRule (ruleId);
@@ -83,14 +83,14 @@ namespace Ink
             
         protected Parsed.Return ReturnStatement()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             var returnOrDone = Parse(Identifier);
             if (returnOrDone != "return") {
                 return null;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var expr = Parse(Expression);
 
@@ -115,7 +115,7 @@ namespace Ink
 		// (see link for advice on how to extend for postfix and mixfix operators)
 		protected Expression Expression(int minimumPrecedence)
 		{
-			Whitespace ();
+            IgnoredWhitespace();
 
 			// First parse a unary expression e.g. "-a" or parethensised "(1 + 2)"
 			var expr = ExpressionUnary ();
@@ -123,7 +123,7 @@ namespace Ink
                 return null;
 			}
 
-			Whitespace ();
+            IgnoredWhitespace();
 
 			// Attempt to parse (possibly multiple) continuing infix expressions (e.g. 1 + 2 + 3)
 			while(true) {
@@ -143,8 +143,8 @@ namespace Ink
 
                         return null;
                     }
-
-                    expr = SucceedRule(ruleId, multiaryExpr) as Parsed.Expression;
+                    SucceedRule(ruleId, multiaryExpr);
+                    expr = multiaryExpr;
 
 					continue;
 				}
@@ -153,7 +153,7 @@ namespace Ink
 				break;
 			}
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             return expr;
 		}
@@ -178,7 +178,7 @@ namespace Ink
                 prefixOp = Parse(ExpressionNot);
             }
 
-			Whitespace ();
+            IgnoredWhitespace();
 
             // - Since we allow numbers at the start of variable names, variable names are checked before literals
             // - Function calls before variable names in case we see parentheses
@@ -196,7 +196,7 @@ namespace Ink
                 expr = UnaryExpression.WithInner(expr, prefixOp);
 			}
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var postfixOp = (string) OneOf (String ("++"), String ("--"));
             if (postfixOp != null) {
@@ -228,12 +228,12 @@ namespace Ink
 
 		protected Expression ExpressionLiteral()
 		{
-            return (Expression) OneOf (ExpressionFloat, ExpressionInt, ExpressionBool, ExpressionString);
+            return OneOf<Expression> (ExpressionFloat, ExpressionInt, ExpressionBool, ExpressionString);
 		}
 
         protected Expression ExpressionDivertTarget()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             var divert = Parse(SingleDivert);
             if (divert == null)
@@ -242,7 +242,7 @@ namespace Ink
             if (divert.isThread)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             return new DivertTarget (divert);
         }
@@ -312,7 +312,7 @@ namespace Ink
             if (iden == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var arguments = Parse(ExpressionFunctionCallArguments);
             if (arguments == null) {
@@ -328,13 +328,13 @@ namespace Ink
                 return null;
 
             // "Exclude" requires the rule to succeed, but causes actual comma string to be excluded from the list of results
-            ParseRule commas = Exclude (String (","));
+            SpecificParseRule<Empty> commas = Exclude (String (","));
             var arguments = Interleave<Expression>(Expression, commas);
             if (arguments == null) {
                 arguments = new List<Expression> ();
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String (")"), "closing ')' for function call");
 
@@ -343,7 +343,7 @@ namespace Ink
 
         protected Expression ExpressionVariableName()
         {
-            List<string> path = Interleave<string> (Identifier, Exclude (Spaced (String ("."))));
+            List<string> path = Interleave<string> (Identifier, Exclude(Spaced (String ("."))));
             
             if (path == null || VariableAssignment.IsReservedKeyword (path[0]) )
                 return null;
@@ -360,7 +360,7 @@ namespace Ink
 			if (innerExpr == null)
                 return null;
 
-			Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String(")"), "closing parenthesis ')' for expression");
 
@@ -369,7 +369,7 @@ namespace Ink
 
 		protected Expression ExpressionInfixRight(Parsed.Expression left, InfixOperator op)
 		{
-			Whitespace ();
+            IgnoredWhitespace();
 
             var right = Parse(() => Expression (op.precedence));
 			if (right) {
@@ -393,13 +393,13 @@ namespace Ink
                 if (ParseString (op.type) != null) {
 
                     if (op.requireWhitespace) {
-                        if (Whitespace () == null) {
+                        if (Whitespace<object> () == null) {
                             FailRule (ruleId);
                             continue;
                         }
                     }
-
-                    return (InfixOperator) SucceedRule(ruleId, op);
+                    SucceedRule(ruleId, op);
+                    return op;
                 }
 
                 FailRule (ruleId);

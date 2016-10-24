@@ -1676,9 +1676,12 @@ CONST kX = ""hi""
         public void TestStringParserABAOptional()
         {
             StringParser p = new StringParser("ABAA");
-            var results = p.Interleave<string>(
+            var results = p.Interleave<string, Option<string>, string>(
                 () => p.ParseString("A"),
-                p.Optional(() => p.ParseString("B")));
+                p.AddResultToList,
+                p.Optional(() => p.ParseString("B")),
+                p.TryAddResultToList,
+                p.AlwaysTrue);
 
             var expected = new[] { "A", "B", "A", "A" };
             Assert.AreEqual(expected, results);
@@ -1688,9 +1691,12 @@ CONST kX = ""hi""
         public void TestStringParserABAOptional2()
         {
             StringParser p = new StringParser("BABB");
-            var results = p.Interleave<string>(
+            var results = p.Interleave<Option<string>,string,string>(
                 p.Optional(() => p.ParseString("A")),
-                () => p.ParseString("B"));
+                p.TryAddResultToList,
+                () => p.ParseString("B"),
+                p.AddResultToList,
+                p.AlwaysTrue);
 
             var expected = new[] { "B", "A", "B", "B" };
             Assert.AreEqual(expected, results);

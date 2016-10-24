@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Ink.Parsed;
 
+
 namespace Ink
 {
 	internal partial class InkParser
@@ -24,16 +25,19 @@ namespace Ink
                     Error ("You can't use a gather (the dashes) within the { curly braces } context. For multi-line sequences and conditions, you should only use one dash.");
                 }
             }
-                
-			return Interleave<Parsed.Object>(
-                Optional (MultilineWhitespace), 
-                () => StatementAtLevel (level), 
+
+            return Interleave<Option<Empty>,object,Parsed.Object>(
+                Optional (MultilineWhitespace),
+                Helpers.doNothing,
+                () => StatementAtLevel(level),
+                (x,list) => LegacyTryAddResultToList(x,list),
+                AlwaysTrue,
                 untilTerminator: () => StatementsBreakForLevel(level));
 		}
             
         protected object StatementAtLevel(StatementLevel level)
         {            
-            ParseRule[] rulesAtLevel = _statementRulesAtLevel[(int)level];
+            SpecificParseRule<object>[] rulesAtLevel = _statementRulesAtLevel[(int)level];
 
             var statement = OneOf (rulesAtLevel);
 
@@ -50,9 +54,9 @@ namespace Ink
 
         protected object StatementsBreakForLevel(StatementLevel level)
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
-            ParseRule[] breakRules = _statementBreakRulesAtLevel[(int)level];
+            SpecificParseRule<object>[] breakRules = _statementBreakRulesAtLevel[(int)level];
 
             var breakRuleResult = OneOf (breakRules);
             if (breakRuleResult == null)
@@ -65,15 +69,15 @@ namespace Ink
 		{
             var levels = Enum.GetValues (typeof(StatementLevel)).Cast<StatementLevel> ().ToList();
 
-            _statementRulesAtLevel = new ParseRule[levels.Count][];
-            _statementBreakRulesAtLevel = new ParseRule[levels.Count][];
+            _statementRulesAtLevel = new SpecificParseRule<object>[levels.Count][];
+            _statementBreakRulesAtLevel = new SpecificParseRule<object>[levels.Count][];
 
             foreach (var level in levels) {
-                List<ParseRule> rulesAtLevel = new List<ParseRule> ();
-                List<ParseRule> breakingRules = new List<ParseRule> ();
+                var rulesAtLevel = new List<SpecificParseRule<object>> ();
+                var breakingRules = new List<SpecificParseRule<object>> ();
 
                 // Diverts can go anywhere
-                rulesAtLevel.Add(Line(MultiDivert));
+                rulesAtLevel.Add(() => Line(MultiDivert)());
 
                 if (level >= StatementLevel.Top) {
 
@@ -82,9 +86,9 @@ namespace Ink
                     rulesAtLevel.Add (ExternalDeclaration);
                 }
 
-                rulesAtLevel.Add(Line(Choice));
+                rulesAtLevel.Add(() => Line(Choice)());
 
-                rulesAtLevel.Add(Line(AuthorWarning));
+                rulesAtLevel.Add(() => Line(AuthorWarning)());
 
                 // Gather lines would be confused with multi-line block separators, like
                 // within a multi-line if statement
@@ -94,37 +98,37 @@ namespace Ink
 
                 // Stitches (and gathers) can (currently) only go in Knots and top level
                 if (level >= StatementLevel.Knot) {
-                    rulesAtLevel.Add (StitchDefinition);
+                    rulesAtLevel.Add (() => StitchDefinition());
                 }
 
                 // Global variable declarations can go anywhere
-                rulesAtLevel.Add(Line(VariableDeclaration));
-                rulesAtLevel.Add(Line(ConstDeclaration));
+                rulesAtLevel.Add(() => Line(VariableDeclaration)());
+                rulesAtLevel.Add(() => Line(ConstDeclaration)());
 
                 // Global include can go anywhere
-                rulesAtLevel.Add(Line(IncludeStatement));
+                rulesAtLevel.Add(() => Line(IncludeStatement)());
 
                 // Normal logic / text can go anywhere
                 rulesAtLevel.Add(LogicLine);
-                rulesAtLevel.Add(LineOfMixedTextAndLogic);
+                rulesAtLevel.Add(() => LineOfMixedTextAndLogic());
 
                 // --------
                 // Breaking rules
 
                 // Break current knot with a new knot
                 if (level <= StatementLevel.Knot) {
-                    breakingRules.Add (KnotDeclaration);
+                    breakingRules.Add (() => KnotDeclaration());
                 }
 
                 // Break current stitch with a new stitch
                 if (level <= StatementLevel.Stitch) {
-                    breakingRules.Add (StitchDeclaration);
+                    breakingRules.Add (() => StitchDeclaration());
                 }
 
                 // Breaking an inner block (like a multi-line condition statement)
                 if (level <= StatementLevel.InnerBlock) {
-                    breakingRules.Add (ParseDashNotArrow);
-                    breakingRules.Add (String ("}"));
+                    breakingRules.Add (() => ParseDashNotArrow());
+                    breakingRules.Add (() => String ("}")());
                 }
 
                 _statementRulesAtLevel [(int)level] = rulesAtLevel.ToArray ();
@@ -132,20 +136,20 @@ namespace Ink
             }
 		}
 
-		protected object SkipToNextLine()
+		protected Empty SkipToNextLine()
 		{
 			ParseUntilCharactersFromString ("\n\r");
 			ParseNewline ();
-			return ParseSuccess;
+			return Empty.empty;
 		}
 
 		// Modifier to turn a rule into one that expects a newline on the end.
 		// e.g. anywhere you can use "MixedTextAndLogic" as a rule, you can use 
 		// "Line(MixedTextAndLogic)" to specify that it expects a newline afterwards.
-		protected ParseRule Line(ParseRule inlineRule)
+		protected SpecificParseRule<T> Line<T>(SpecificParseRule<T> inlineRule) where T : class
 		{
 			return () => {
-				object result = ParseObject(inlineRule);
+				T result = Parse(inlineRule);
                 if (result == null) {
                     return null;
                 }
@@ -157,8 +161,8 @@ namespace Ink
 		}
 
 
-        ParseRule[][] _statementRulesAtLevel;
-        ParseRule[][] _statementBreakRulesAtLevel;
+        SpecificParseRule<object>[][] _statementRulesAtLevel;
+        SpecificParseRule<object>[][] _statementBreakRulesAtLevel;
 	}
 }
 

@@ -22,7 +22,7 @@ namespace Ink
         {
             CommandLineInput result = new CommandLineInput ();
 
-            Whitespace ();
+            IgnoredWhitespace ();
 
             if (ParseString ("help") != null) {
                 result.isHelp = true;
@@ -39,18 +39,18 @@ namespace Ink
 
         CommandLineInput DebugSource ()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString ("DebugSource") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var expectMsg = "character offset in parentheses, e.g. DebugSource(5)";
             if (Expect (String ("("), expectMsg) == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             int? characterOffset = ParseInt ();
             if (characterOffset == null) {
@@ -58,7 +58,7 @@ namespace Ink
                 return null;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String (")"), "closing parenthesis");
 
@@ -69,14 +69,14 @@ namespace Ink
 
         CommandLineInput UserChoiceNumber()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             int? number = ParseInt ();
             if (number == null) {
                 return null;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (Parse(EndOfLine) == null) {
                 return null;

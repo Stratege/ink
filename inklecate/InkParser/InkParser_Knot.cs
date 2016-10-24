@@ -20,21 +20,21 @@ namespace Ink
 
 			Expect(EndOfLine, "end of line after knot name definition", recoveryRule: SkipToNextLine);
 
-			ParseRule innerKnotStatements = () => StatementsAtLevel (StatementLevel.Knot);
+			SpecificParseRule<List<Parsed.Object>> innerKnotStatements = () => StatementsAtLevel (StatementLevel.Knot);
 
-            var content = Expect (innerKnotStatements, "at least one line within the knot", recoveryRule: KnotStitchNoContentRecoveryRule) as List<Parsed.Object>;
+            var content = Expect<List<Parsed.Object>> (innerKnotStatements, "at least one line within the knot", recoveryRule: KnotStitchNoContentRecoveryRule);
 			 
             return new Knot (knotDecl.name, content, knotDecl.arguments, knotDecl.isFunction);
 		}
 
         protected FlowDecl KnotDeclaration()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (KnotTitleEquals () == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
 
             string identifier = Parse(Identifier);
@@ -42,17 +42,17 @@ namespace Ink
 
             bool isFunc = identifier == "function";
             if (isFunc) {
-                Expect (Whitespace, "whitespace after the 'function' keyword");
+                Expect(Whitespace<object>, "whitespace after the 'function' keyword");
                 knotName = Expect (Identifier, "the name of the function") as string;
             } else {
                 knotName = identifier;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             List<FlowBase.Argument> parameterNames = Parse (BracketedKnotDeclArguments);
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Optional equals after name
             Parse(KnotTitleEquals);
@@ -71,7 +71,7 @@ namespace Ink
             }
         }
 
-		protected object StitchDefinition()
+		protected Stitch StitchDefinition()
 		{
             var decl = Parse(StitchDeclaration);
             if (decl == null)
@@ -79,7 +79,7 @@ namespace Ink
 
 			Expect(EndOfLine, "end of line after stitch name", recoveryRule: SkipToNextLine);
 
-			ParseRule innerStitchStatements = () => StatementsAtLevel (StatementLevel.Stitch);
+			SpecificParseRule<List<Object>> innerStitchStatements = () => StatementsAtLevel (StatementLevel.Stitch);
 
             var content = Expect(innerStitchStatements, "at least one line within the stitch", recoveryRule: KnotStitchNoContentRecoveryRule) as List<Parsed.Object>;
 
@@ -88,7 +88,7 @@ namespace Ink
 
         protected FlowDecl StitchDeclaration()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Single "=" to define a stitch
             if (ParseString ("=") == null)
@@ -98,29 +98,29 @@ namespace Ink
             if (ParseString ("=") != null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Stitches aren't allowed to be functions, but we parse it anyway and report the error later
             bool isFunc = ParseString ("function") != null;
             if ( isFunc ) {
-                Whitespace ();
+                IgnoredWhitespace();
             }
 
             string stitchName = Parse(Identifier);
             if (stitchName == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             List<FlowBase.Argument> flowArgs = Parse(BracketedKnotDeclArguments);
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             return new FlowDecl () { name = stitchName, arguments = flowArgs, isFunction = isFunc };
         }
 
 
-		protected object KnotStitchNoContentRecoveryRule()
+		protected List<Parsed.Object> KnotStitchNoContentRecoveryRule()
 		{
             // Jump ahead to the next knot or the end of the file
             ParseUntil (KnotDeclaration, new CharacterSet ("="), null);
@@ -156,9 +156,9 @@ namespace Ink
             //  ref name
             //  ref -> name  (variable divert target by reference)
             var firstIden = Parse(Identifier);
-            Whitespace ();
+            IgnoredWhitespace();
             var divertArrow = ParseDivertArrow ();
-            Whitespace ();
+            IgnoredWhitespace();
             var secondIden = Parse(Identifier);
 
             if (firstIden == null && secondIden == null)
@@ -202,17 +202,17 @@ namespace Ink
 
         protected ExternalDeclaration ExternalDeclaration()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             string external = Parse(Identifier);
             if (external != "EXTERNAL")
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
             
             string funcName = Expect(Identifier, "name of external function") as string ?? "";
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var parameterNames = Expect (BracketedKnotDeclArguments, "declaration of arguments for EXTERNAL, even if empty, i.e. 'EXTERNAL "+funcName+"()'") as List<FlowBase.Argument>;
             if (parameterNames == null)

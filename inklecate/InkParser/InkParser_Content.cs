@@ -74,12 +74,12 @@ namespace Ink
         protected List<Parsed.Object> MixedTextAndLogic()
         {
             // Check for disallowed "~" within this context
-            var disallowedTilda = ParseObject(Spaced(String("~")));
+            var disallowedTilda = Parse(Spaced(String("~")));
             if (disallowedTilda != null)
                 Error ("You shouldn't use a '~' here - tildas are for logic that's on its own line. To do inline logic, use { curly braces } instead");
 
             // Either, or both interleaved
-            var results = Interleave<Parsed.Object>(Optional (ContentText), Optional (InlineLogicOrGlue));
+            var results = Interleave<Option<Text>,Option<Object>,Object>(Optional (ContentText), (x,xs) => TryAddResultToList(x.lift((y) => (Object)y),xs), Optional (InlineLogicOrGlue), (x, xs) => TryAddResultToList(x, xs), DefaultOptionalCond);
 
             // Terminating divert?
             // (When parsing content for the text of a choice, diverts aren't allowed.
@@ -172,7 +172,7 @@ namespace Ink
             }
 
             // When the ParseUntil pauses, check these rules in case they evaluate successfully
-            ParseRule nonTextRule = () => OneOf (ParseDivertArrow, ParseThreadArrow, EndOfLine, Glue);
+            SpecificParseRule<object> nonTextRule = () => OneOf (ParseDivertArrow, ParseThreadArrow, EndOfLine, Glue);
 
             CharacterSet endChars = null;
             if (parsingStringExpression) {

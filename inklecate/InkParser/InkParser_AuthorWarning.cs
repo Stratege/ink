@@ -6,16 +6,16 @@ namespace Ink
     {
         protected AuthorWarning AuthorWarning()
         {
-            Whitespace ();
+            IgnoredWhitespace ();
 
             if (Parse (Identifier) != "TODO")
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             ParseString (":");
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var message = ParseUntilCharactersFromString ("\n\r");
 

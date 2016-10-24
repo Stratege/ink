@@ -8,7 +8,7 @@ namespace Ink
     {
         protected Sequence InnerSequence()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Default sequence type
             SequenceType seqType = SequenceType.Stopping;
@@ -80,7 +80,7 @@ namespace Ink
             if (seqType == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString (":") == null)
                 return null;
@@ -104,7 +104,7 @@ namespace Ink
 
         protected List<ContentList> InnerInlineSequenceObjects()
         {
-            var interleavedContentAndPipes = Interleave<object> (Optional (MixedTextAndLogic), String ("|"), flatten:false);
+            var interleavedContentAndPipes = Interleave<Option<List<Object>>,string,Either<List<Object>,string>> (Optional (MixedTextAndLogic), (x,xs) => TryAddResultToList(x.lift(Either<List<Object>,string>.Left),xs), String ("|"), (x,xs) => xs.Add(Either<List<Object>, string>.Right(x)),AlwaysTrue);
             if (interleavedContentAndPipes == null)
                 return null;
 
@@ -113,10 +113,10 @@ namespace Ink
             // The content and pipes won't necessarily be perfectly interleaved in the sense that
             // the content can be missing, but in that case it's intended that there's blank content.
             bool justHadContent = false;
-            foreach (object contentOrPipe in interleavedContentAndPipes) {
+            foreach (var contentOrPipe in interleavedContentAndPipes) {
 
                 // Pipe/separator
-                if (contentOrPipe as string == "|") {
+                if (!contentOrPipe.IsLeft() && contentOrPipe.GetRight() == "|") {
 
                     // Expected content, saw pipe - need blank content now
                     if (!justHadContent) {
@@ -130,12 +130,12 @@ namespace Ink
 
                 // Real content
                 else {
-
-                    var content = contentOrPipe as List<Parsed.Object>;
-                    if (content == null) {
-                        Error ("Expected content, but got " + contentOrPipe + " (this is an ink compiler bug!)");
+                    if (contentOrPipe == null)
+                        Error("Expected content, but got " + "null" + " (this is an ink compiler bug!)");
+                    else if (!contentOrPipe.IsLeft()) {
+                        Error ("Expected content, but got " + "string" + " (this is an ink compiler bug!)");
                     } else {
-                        result.Add (new ContentList (content));
+                        result.Add (new ContentList (contentOrPipe.GetLeft()));
                     }
 
                     justHadContent = true;
@@ -162,7 +162,7 @@ namespace Ink
 
         protected ContentList SingleMultilineSequenceElement()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Make sure we're not accidentally parsing a divert
             if (ParseString ("->") != null)
@@ -171,7 +171,7 @@ namespace Ink
             if (ParseString ("-") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
 
             List<Parsed.Object> content = StatementsAtLevel (StatementLevel.InnerBlock);

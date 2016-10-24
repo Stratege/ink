@@ -8,12 +8,12 @@ namespace Ink
     {
         protected Parsed.Tag Tag ()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString ("#") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var sb = new StringBuilder ();
             do {

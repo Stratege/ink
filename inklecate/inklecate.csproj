@@ -74,6 +74,7 @@
     <Compile Include="ParsedHierarchy\VariableReference.cs" />
     <Compile Include="ParsedHierarchy\Weave.cs" />
     <Compile Include="ParsedHierarchy\Wrap.cs" />
+    <Compile Include="StringParser\Helpers.cs" />
     <Compile Include="StringParser\StringParser.cs" />
     <Compile Include="StringParser\StringParserState.cs" />
     <Compile Include="InkParser\InkParser.cs" />

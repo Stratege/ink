@@ -157,7 +157,7 @@ namespace Ink
 
         protected List<ConditionalSingleBranch> InlineConditionalBranches()
         {
-            var listOfLists = Interleave<List<Parsed.Object>> (MixedTextAndLogic, Exclude (String ("|")), flatten: false);
+            var listOfLists = Interleave<List<Parsed.Object>> (MixedTextAndLogic, Exclude (String ("|")));
             if (listOfLists == null || listOfLists.Count == 0) {
                 return null;
             }
@@ -186,18 +186,18 @@ namespace Ink
         {
             MultilineWhitespace ();
 
-            List<object> multipleConditions = OneOrMore (SingleMultilineCondition);
+            List<ConditionalSingleBranch> multipleConditions = OneOrMore (SingleMultilineCondition);
             if (multipleConditions == null)
                 return null;
             
             MultilineWhitespace ();
 
-            return multipleConditions.Cast<ConditionalSingleBranch>().ToList();
+            return multipleConditions;
         }
 
         protected ConditionalSingleBranch SingleMultilineCondition()
         {
-            Whitespace ();
+            IgnoredWhitespace ();
 
             // Make sure we're not accidentally parsing a divert
             if (ParseString ("->") != null)
@@ -206,7 +206,7 @@ namespace Ink
             if (ParseString ("-") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expression expr = null;
             bool isElse = Parse(ElseExpression) != null;
@@ -244,7 +244,7 @@ namespace Ink
             if (expr == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString (":") == null)
                 return null;
@@ -257,12 +257,12 @@ namespace Ink
             if (ParseString ("else") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString (":") == null)
                 return null;
 
-            return ParseSuccess;
+            return Option<object>.parseSuccess();
         }
     }
 }

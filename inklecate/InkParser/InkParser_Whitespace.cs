@@ -11,9 +11,9 @@ namespace Ink
 		}
 
         // Allow whitespace before the actual newline
-        protected object Newline()
+        protected Empty Newline()
         {
-            Whitespace();
+            IgnoredWhitespace();
 
             bool gotNewline = ParseNewline () != null;
 
@@ -22,25 +22,25 @@ namespace Ink
             if( !gotNewline ) {
                 return null;
             } else {
-                return ParseSuccess;
+                return Empty.empty;
             }
         }
 
-		protected object EndOfFile()
+		protected Empty EndOfFile()
 		{
-			Whitespace();
+            IgnoredWhitespace();
 
             if (!endOfInput)
                 return null;
 
-            return ParseSuccess;
+            return Empty.empty;
 		}
 
 
 		// General purpose space, returns N-count newlines (fails if no newlines)
-		protected object MultilineWhitespace()
+		protected Empty MultilineWhitespace()
 		{
-            List<object> newlines = OneOrMore(Newline);
+            List<Empty> newlines = OneOrMore(Newline);
             if (newlines == null)
                 return null;
 
@@ -48,33 +48,38 @@ namespace Ink
 			// (in most circumstances it's unimportant)
 			int numNewlines = newlines.Count;
 			if (numNewlines >= 1) {
-                return ParseSuccess;
+                return Empty.empty;
 			} else {
                 return null;
 			}
 		}
 
-		protected object Whitespace()
+		protected Option<T> Whitespace<T>() where T : class
 		{
 			if( ParseCharactersFromCharSet(_inlineWhitespaceChars) != null ) {
-				return ParseSuccess;
+				return Option<T>.parseSuccess();
 			}
 
 			return null;
 		}
 
-        protected ParseRule Spaced(ParseRule rule)
+        protected void IgnoredWhitespace()
+        {
+            ParseCharactersFromCharSet(_inlineWhitespaceChars);
+        }
+
+        protected SpecificParseRule<T> Spaced<T>(SpecificParseRule<T> rule) where T : class
         {
             return () => {
 
-                Whitespace ();
+                IgnoredWhitespace();
 
-                var result = ParseObject(rule);
+                var result = Parse(rule);
                 if (result == null) {
                     return null;
                 }
 
-                Whitespace ();
+                IgnoredWhitespace();
 
                 return result;
             };

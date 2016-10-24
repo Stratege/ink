@@ -9,12 +9,12 @@ namespace Ink
     {
         protected object IncludeStatement()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString ("INCLUDE") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var filename = (string) Expect(() => ParseUntilCharactersFromString ("\n\r"), "filename for include statement");
             filename = filename.TrimEnd (' ', '\t');

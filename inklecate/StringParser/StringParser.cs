@@ -6,49 +6,47 @@ using System.Text;
 
 namespace Ink
 {
-	internal class StringParser
-	{
-		public delegate object ParseRule();
+    internal class StringParser
+    {
+        public delegate object ParseRule();
 
         public delegate T SpecificParseRule<T>() where T : class;
 
         public delegate void ErrorHandler(string message, int index, int lineIndex, bool isWarning);
-		
-		public StringParser (string str)
-		{
-            str = PreProcessInputString (str);
+
+        public StringParser(string str)
+        {
+            str = PreProcessInputString(str);
 
             state = new StringParserState();
 
             if (str != null) {
-                _chars = str.ToCharArray ();
+                _chars = str.ToCharArray();
             } else {
                 _chars = new char[0];
             }
-			
-			inputString = str;
-		}
-            
-		internal class ParseSuccessStruct {};
-		public static ParseSuccessStruct ParseSuccess = new ParseSuccessStruct();
 
-		public static CharacterSet numbersCharacterSet = new CharacterSet("0123456789");
+            inputString = str;
+        }
+
+
+        public static CharacterSet numbersCharacterSet = new CharacterSet("0123456789");
 
         protected ErrorHandler errorHandler { get; set; }
 
-		public char currentCharacter
-		{
-			get 
-			{
-				if (index >= 0 && remainingLength > 0) {
-					return _chars [index];
-				} else {
-					return (char)0;
-				}
-			}
-		}
+        public char currentCharacter
+        {
+            get
+            {
+                if (index >= 0 && remainingLength > 0) {
+                    return _chars[index];
+                } else {
+                    return (char)0;
+                }
+            }
+        }
 
-		public StringParserState state { get; private set; }
+        public StringParserState state { get; private set; }
 
         public bool hadError { get; protected set; }
 
@@ -59,136 +57,136 @@ namespace Ink
             return str;
         }
 
-		//--------------------------------
-		// Parse state
-		//--------------------------------
+        //--------------------------------
+        // Parse state
+        //--------------------------------
 
         protected int BeginRule()
         {
-            return state.Push ();
+            return state.Push();
         }
 
         protected object FailRule(int expectedRuleId)
         {
-            state.Pop (expectedRuleId);
+            state.Pop(expectedRuleId);
             return null;
         }
 
         protected void CancelRule(int expectedRuleId)
         {
-            state.Pop (expectedRuleId);
+            state.Pop(expectedRuleId);
         }
 
-        protected object SucceedRule(int expectedRuleId, object result = null)
+        protected Option<T> SucceedRule<T>(int expectedRuleId, T result = null) where T : class
         {
             // Get state at point where this rule stared evaluating
             var stateAtSucceedRule = state.Peek(expectedRuleId);
-            var stateAtBeginRule = state.PeekPenultimate ();
+            var stateAtBeginRule = state.PeekPenultimate();
 
 
             // Allow subclass to receive callback
-            RuleDidSucceed (result, stateAtBeginRule, stateAtSucceedRule);
+            RuleDidSucceed(result, stateAtBeginRule, stateAtSucceedRule);
 
             // Flatten state stack so that we maintain the same values,
             // but remove one level in the stack.
             state.Squash();
 
             if (result == null) {
-                result = ParseSuccess;
+                return Option<T>.parseSuccess();
             }
 
-            return result;
+            return new Option<T>(result);
         }
 
         protected virtual void RuleDidSucceed(object result, StringParserState.Element startState, StringParserState.Element endState)
         {
 
         }
-            
-        protected object Expect(ParseRule rule, string message = null, ParseRule recoveryRule = null)
-		{
-            object result = ParseObject(rule);
-			if (result == null) {
-				if (message == null) {
+
+        protected T Expect<T>(SpecificParseRule<T> rule, string message = null, SpecificParseRule<T> recoveryRule = null) where T : class
+        {
+            T result = Parse<T>(rule);
+            if (result == null) {
+                if (message == null) {
                     message = rule.Method.Name;
-				}
+                }
 
                 string butSaw;
-                string lineRemainder = LineRemainder ();
+                string lineRemainder = LineRemainder();
                 if (lineRemainder == null || lineRemainder.Length == 0) {
                     butSaw = "end of line";
                 } else {
                     butSaw = "'" + lineRemainder + "'";
                 }
-                    
-                Error ("Expected "+message+" but saw "+butSaw);
 
-				if (recoveryRule != null) {
-					result = recoveryRule ();
-				}
-			}
-			return result;
-		}
+                Error("Expected " + message + " but saw " + butSaw);
+
+                if (recoveryRule != null) {
+                    result = recoveryRule();
+                }
+            }
+            return result;
+        }
 
         protected void Error(string message, bool isWarning = false)
-		{
-            ErrorOnLine (message, lineIndex + 1, isWarning);
-		}
+        {
+            ErrorOnLine(message, lineIndex + 1, isWarning);
+        }
 
         protected void ErrorWithParsedObject(string message, Parsed.Object result, bool isWarning = false)
         {
-            ErrorOnLine (message, result.debugMetadata.startLineNumber, isWarning);
+            ErrorOnLine(message, result.debugMetadata.startLineNumber, isWarning);
         }
 
         protected void ErrorOnLine(string message, int lineNumber, bool isWarning)
         {
-            if ( !state.errorReportedAlreadyInScope ) {
+            if (!state.errorReportedAlreadyInScope) {
 
                 var errorType = isWarning ? "Warning" : "Error";
 
                 if (errorHandler == null) {
-                    Console.WriteLine (errorType+" on line " + lineNumber + ": " + message);
+                    Console.WriteLine(errorType + " on line " + lineNumber + ": " + message);
                 } else {
-                    errorHandler (message, index, lineNumber-1, isWarning);
+                    errorHandler(message, index, lineNumber - 1, isWarning);
                 }
 
-                state.NoteErrorReported ();
+                state.NoteErrorReported();
             }
 
-            if( !isWarning )
+            if (!isWarning)
                 hadError = true;
         }
 
         protected void Warning(string message)
         {
-            Error(message, isWarning:true);
+            Error(message, isWarning: true);
         }
-            
-		public bool endOfInput
-		{
-			get { return index >= _chars.Length; }
-		}
 
-		public string remainingString
-		{
-			get {
-				return new string(_chars, index, remainingLength);
-			}
-		}
+        public bool endOfInput
+        {
+            get { return index >= _chars.Length; }
+        }
+
+        public string remainingString
+        {
+            get {
+                return new string(_chars, index, remainingLength);
+            }
+        }
 
         public string LineRemainder()
-		{
-            return (string) Peek (() => ParseUntilCharactersFromString ("\n\r"));
-		}
+        {
+            return (string)Peek(() => ParseUntilCharactersFromString("\n\r"));
+        }
 
-		public int remainingLength
-		{
-			get {
-				return _chars.Length - index;
-			}
-		}
+        public int remainingLength
+        {
+            get {
+                return _chars.Length - index;
+            }
+        }
 
-		public string inputString { get; private set; }
+        public string inputString { get; private set; }
 
 
         public int lineIndex
@@ -227,193 +225,276 @@ namespace Ink
             return (state.customFlags & flag) != 0;
         }
 
-		//--------------------------------
-		// Structuring
-		//--------------------------------
+        //--------------------------------
+        // Structuring
+        //--------------------------------
 
         public object ParseObject(ParseRule rule)
         {
-            int ruleId = BeginRule ();
+            int ruleId = BeginRule();
 
             var stackHeightBefore = state.stackHeight;
 
-            var result = rule ();
+            var result = rule();
 
             if (stackHeightBefore != state.stackHeight) {
-                throw new System.Exception ("Mismatched Begin/Fail/Succeed rules");
+                throw new System.Exception("Mismatched Begin/Fail/Succeed rules");
             }
 
             if (result == null)
-                return FailRule (ruleId);
+                return FailRule(ruleId);
 
-            SucceedRule (ruleId, result);
+            SucceedRule(ruleId, result);
             return result;
         }
 
         public T Parse<T>(SpecificParseRule<T> rule) where T : class
         {
-            int ruleId = BeginRule ();
+            int ruleId = BeginRule();
 
-            var result = rule () as T;
+            var result = rule();
             if (result == null) {
-                FailRule (ruleId);
+                FailRule(ruleId);
                 return null;
             }
 
-            SucceedRule (ruleId, result);
+            SucceedRule(ruleId, result);
             return result;
         }
 
-		public object OneOf(params ParseRule[] array)
-		{
-			foreach (ParseRule rule in array) {
-                object result = ParseObject(rule);
-				if (result != null)
+        public T OneOf<T>(params SpecificParseRule<T>[] array) where T : class
+        {
+            foreach (SpecificParseRule<T> rule in array) {
+                T result = Parse<T>(rule);
+                if (result != null)
                     return result;
-			}
+            }
 
-			return null;
-		}
+            return null;
+        }
 
-		public List<object> OneOrMore(ParseRule rule)
-		{
-			var results = new List<object> ();
+        public List<T> OneOrMore<T>(SpecificParseRule<T> rule) where T : class
+        {
+            var results = new List<T>();
 
-			object result = null;
-			do {
-                result = ParseObject(rule);
-				if( result != null ) {
-					results.Add(result);
-				}
-			} while(result != null);
+            T result = null;
+            do {
+                result = Parse<T>(rule);
+                if (result != null) {
+                    results.Add(result);
+                }
+            } while (result != null);
 
-			if (results.Count > 0) {
-				return results;
-			} else {
-				return null;
-			}
-		}
+            if (results.Count > 0) {
+                return results;
+            } else {
+                return null;
+            }
+        }
 
-		public ParseRule Optional(ParseRule rule)
-		{
-			return () => {
-                object result = ParseObject(rule);
-				if( result == null ) {
-					result = ParseSuccess;
-				}
-				return result;
-			};
-		}
+        public SpecificParseRule<Option<T>> Optional<T>(SpecificParseRule<T> rule) where T : class
+        {
+            return () => {
+                T result = Parse<T>(rule);
+                if (result == null) {
+                    return Option<T>.parseSuccess();
+                }
+                return new Option<T>(result);
+            };
+        }
 
         // Return ParseSuccess instead the real result so that it gets excluded
         // from result arrays (e.g. Interleave)
-        public ParseRule Exclude(ParseRule rule)
+        public SpecificParseRule<Empty> Exclude<T>(SpecificParseRule<T> rule) where T : class
         {
             return () => {
-                object result = ParseObject(rule);
-                if( result == null ) {
+                T result = Parse<T>(rule);
+                if (result == null) {
                     return null;
                 }
-                return ParseSuccess;
+                return Empty.empty;
             };
         }
 
         // Combination of both of the above
-        public ParseRule OptionalExclude(ParseRule rule)
+        public SpecificParseRule<Option<T>> OptionalExclude<T>(SpecificParseRule<T> rule) where T : class
         {
             return () => {
-                ParseObject(rule);
-                return ParseSuccess;
+                Parse<T>(rule);
+                return Option<T>.parseSuccess();
             };
         }
 
         // Convenience method for creating more readable ParseString rules that can be combined
         // in other structuring rules (like OneOf etc)
         // e.g. OneOf(String("one"), String("two"))
-        protected ParseRule String(string str)
+        protected SpecificParseRule<String> String(string str)
         {
-            return () => ParseString (str);
+            return () => ParseString(str);
         }
 
-		private void TryAddResultToList<T>(object result, List<T> list, bool flatten = true)
+        public void LegacyTryAddResultToList<T>(object result, List<T> list, bool flatten = true) where T : class
+        {
+            if (result is Empty)
+                return;
+            var checkForOption = result as Option<T>;
+            if (checkForOption != null)
+            {
+                if (checkForOption.empty)
+                    return;
+                result = checkForOption.getValue();
+            }
+            var checkForOption2 = result as Option<List<T>>;
+            if (checkForOption2 != null)
+            {
+                if (checkForOption2.empty)
+                    return;
+                result = checkForOption2.getValue();
+            }
+
+            if (flatten)
+            {
+                var resultCollection = result as System.Collections.ICollection;
+                if (resultCollection != null)
+                {
+                    foreach (object obj in resultCollection)
+                    {
+                        Debug.Assert(obj is T);
+                        list.Add((T)obj);
+                    }
+                    return;
+                }
+            }
+            else
+            {
+                Debug.Print("Called TryAddResult with flatten enabled but unable to flatten");
+            }
+
+
+            Debug.Assert(result is T);
+            list.Add((T)result);
+        }
+
+        private void TryAddResultToList<T>(Option<ICollection<T>> result, List<T> list) where T : class {
+            if (result.empty) {
+                return;
+            }
+
+            var resultCollection = result.getValue();
+            if (resultCollection != null) {
+                foreach (T obj in resultCollection) {
+                    list.Add(obj);
+                }
+            }
+        }
+
+        public void TryAddResultToList<T>(Option<T> result, List<T> list) where T : class
+        {
+            if (result.empty)
+            {
+                return;
+            }
+            list.Add(result.getValue());
+        }
+
+        public void AddResultToList<T>(T result, List<T> list)
+        {
+            list.Add(result);
+        }
+
+        public bool AlwaysTrue<T, K>(T a, K b) { return true; }
+
+        public bool DefaultOptionalCond<T,K> (Option<T> a, Option<K> b) where T : class where K : class
+        { return !(a.empty && b.empty); } 
+
+        public List<T> Interleave<T>(SpecificParseRule<T> ruleA, SpecificParseRule<Empty> ruleB, SpecificParseRule<object> untilTerminator = null) where T : class
+        {
+            return Interleave<T, Empty, T>(ruleA, AddResultToList, ruleB, Helpers.doNothing, AlwaysTrue,untilTerminator);
+        }
+
+        public List<T> Interleave<T>(SpecificParseRule<T> ruleA, SpecificParseRule<T> ruleB, SpecificParseRule<object> untilTerminator = null ) where T : class
 		{
-			if (result == ParseSuccess) {
-				return;
-			}
+            return Interleave<T,T,T>(ruleA, AddResultToList, ruleB, AddResultToList, AlwaysTrue, untilTerminator);
+        }
 
-			if (flatten) {
-				var resultCollection = result as System.Collections.ICollection;
-				if (resultCollection != null) {
-					foreach (object obj in resultCollection) {
-						Debug.Assert (obj is T);
-						list.Add ((T)obj);
-					}
-					return;
-				} 
-			}
+        public List<T> Interleave<T>(SpecificParseRule<Option<T>> ruleA, SpecificParseRule<Option<T>> ruleB, SpecificParseRule<object> untilTerminator = null) where T : class
+        {
+            return Interleave<Option<T>, Option<T>,T>(ruleA,TryAddResultToList,ruleB,TryAddResultToList, DefaultOptionalCond, untilTerminator);
+        }
 
-			Debug.Assert (result is T);
-			list.Add ((T)result);
-		}
+        public List<J> Interleave<T, K, J>(SpecificParseRule<T> ruleA, Action<T, List<J>> mergeA, SpecificParseRule<K> ruleB, Action<K, List<J>> mergeB, Func<T, K, bool> cond, SpecificParseRule<object> untilTerminator = null) where T : class where J : class where K : class
+        {
+            int ruleId = BeginRule();
+
+            var results = new List<J>();
+
+            // First outer padding
+            var firstA = Parse<T>(ruleA);
+            if (firstA == null)
+            {
+                FailRule(ruleId);
+                return null;
+            }
+            else
+            {
+                mergeA(firstA, results);
+            }
+
+            K lastMainResult = null;
+            T outerResult = null;
+            do
+            {
+
+                // "until" condition hit?
+                if (untilTerminator != null && Peek(untilTerminator) != null)
+                {
+                    break;
+                }
+
+                // Main inner
+                lastMainResult = Parse(ruleB);
+                if (lastMainResult == null)
+                {
+                    break;
+                }
+                else
+                {
+                    mergeB(lastMainResult, results);
+                }
+
+                // Outer result (i.e. last A in ABA)
+                outerResult = null;
+                if (lastMainResult != null)
+                {
+                    outerResult = Parse(ruleA);
+                    if (outerResult == null)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        mergeA(outerResult, results);
+                    }
+                }
+
+                // Stop if there are no results, or if both are the placeholder "ParseSuccess" (i.e. Optional success rather than a true value)
+            } while ((lastMainResult != null || outerResult != null)
+                    && cond(outerResult, lastMainResult) && remainingLength > 0);
+            if (results.Count == 0)
+            {
+                FailRule(ruleId);
+                return null;
+            }
+            SucceedRule(ruleId, results);
+            return results;
+        }
 
 
-		public List<T> Interleave<T>(ParseRule ruleA, ParseRule ruleB, ParseRule untilTerminator = null, bool flatten = true)
-		{
-            int ruleId = BeginRule ();
+        //--------------------------------
+        // Basic string parsing
+        //--------------------------------
 
-			var results = new List<T> ();
-
-			// First outer padding
-            var firstA = ParseObject(ruleA);
-			if (firstA == null) {
-                return (List<T>) FailRule(ruleId);
-			} else {
-				TryAddResultToList(firstA, results, flatten);
-			}
-
-			object lastMainResult = null, outerResult = null;
-			do {
-
-				// "until" condition hit?
-				if( untilTerminator != null && Peek(untilTerminator) != null ) {
-					break;
-				}
-
-				// Main inner
-                lastMainResult = ParseObject(ruleB);
-				if( lastMainResult == null ) {
-					break;
-				} else {
-					TryAddResultToList(lastMainResult, results, flatten);
-				}
-
-				// Outer result (i.e. last A in ABA)
-				outerResult = null;
-				if( lastMainResult != null ) {
-                    outerResult = ParseObject(ruleA);
-					if (outerResult == null) {
-						break;
-					} else {
-						TryAddResultToList(outerResult, results, flatten);
-					}
-				}
-
-			// Stop if there are no results, or if both are the placeholder "ParseSuccess" (i.e. Optional success rather than a true value)
-			} while((lastMainResult != null || outerResult != null) 
-				 && !(lastMainResult == ParseSuccess && outerResult == ParseSuccess) && remainingLength > 0);
-
-			if (results.Count == 0) {
-                return (List<T>) FailRule(ruleId);
-			}
-
-            return (List<T>) SucceedRule(ruleId, results);
-		}
-
-		//--------------------------------
-		// Basic string parsing
-		//--------------------------------
-
-		public string ParseString(string str)
+        public string ParseString(string str)
 		{
 			if (str.Length > remainingLength) {
 				return null;
@@ -444,10 +525,13 @@ namespace Ink
             lineIndex = li;
 
 			if (success) {
-                return (string) SucceedRule(ruleId, str);
+                // this was one line before, resulting in a potential cast from ParseSuccessStruct to String
+                SucceedRule(ruleId, str);
+                return str;
 			}
 			else {
-                return (string) FailRule (ruleId);
+                FailRule(ruleId);
+                return null;
 			}
 		}
 
@@ -520,15 +604,15 @@ namespace Ink
 			}
 		}
 
-		public object Peek(ParseRule rule)
+        public T Peek<T>(SpecificParseRule<T> rule) where T : class
 		{
 			int ruleId = BeginRule ();
-			object result = rule ();
+			T result = rule ();
             CancelRule (ruleId);
 			return result;
 		}
 
-		public string ParseUntil(ParseRule stopRule, CharacterSet pauseCharacters = null, CharacterSet endCharacters = null)
+		public string ParseUntil<T>(SpecificParseRule<T> stopRule, CharacterSet pauseCharacters = null, CharacterSet endCharacters = null) where T : class
 		{
 			int ruleId = BeginRule ();
 
@@ -542,7 +626,7 @@ namespace Ink
 			}
 
 			StringBuilder parsedString = new StringBuilder ();
-			object ruleResultAtPause = null;
+			T ruleResultAtPause = null;
 
 			// Keep attempting to parse strings up to the pause (and end) points.
 			//  - At each of the pause points, attempt to parse according to the rule
@@ -584,7 +668,9 @@ namespace Ink
 			} while(true);
 
 			if (parsedString.Length > 0) {
-                return (string) SucceedRule (ruleId, parsedString.ToString ());
+                var str = parsedString.ToString();
+                SucceedRule(ruleId, str);
+                return str;
 			} else {
                 return (string) FailRule (ruleId);
 			}
@@ -642,9 +728,12 @@ namespace Ink
             ParseString ("\r");
 
             if( ParseString ("\n") == null ) {
-                return (string) FailRule(ruleId);
+                FailRule(ruleId);
+                return null;
             } else {
-                return (string) SucceedRule(ruleId, "\n");
+                string str = "\n";
+                SucceedRule(ruleId, str);
+                return str;
             }
         }
 

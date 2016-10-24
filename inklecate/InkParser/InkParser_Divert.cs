@@ -8,7 +8,7 @@ namespace Ink
     {
         protected List<Parsed.Object> MultiDivert()
         {
-            Whitespace ();
+            IgnoredWhitespace ();
 
             List<Parsed.Object> diverts = null;
 
@@ -21,9 +21,12 @@ namespace Ink
             }
 
             // Normal diverts and tunnels
-            var arrowsAndDiverts = Interleave<object> (
+            var arrowsAndDiverts = Interleave<string,Divert,Either<string,Divert>> (
                 ParseDivertArrowOrTunnelOnwards,
-                DivertIdentifierWithArguments);
+                (x,xs) => AddResultToList(Either<string,Divert>.Left(x),xs),
+                DivertIdentifierWithArguments,
+                (x,xs) => AddResultToList(Either<string, Divert>.Right(x),xs),
+                AlwaysTrue);
             
             if (arrowsAndDiverts == null)
                 return null;
@@ -50,7 +53,7 @@ namespace Ink
 
                 // Arrow string
                 if (isArrow) {
-                    string arrow = arrowsAndDiverts [i] as string;
+                    string arrow = arrowsAndDiverts [i].GetLeft();
                     if (arrow == "->->") {
                         if (i == 0) {
                             hasInitialTunnelOnwards = true;
@@ -65,7 +68,7 @@ namespace Ink
                 // Divert
                 else {
 
-                    var divert = arrowsAndDiverts [i] as Divert;
+                    var divert = arrowsAndDiverts [i].GetRight();
 
                     // More to come? (further arrows) Must be tunnelling.
                     if (i < arrowsAndDiverts.Count - 1) {
@@ -112,12 +115,12 @@ namespace Ink
 
         protected Divert StartThread()
         {
-            Whitespace ();
+            IgnoredWhitespace ();
 
             if (ParseThreadArrow() == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var divert = Expect(DivertIdentifierWithArguments, "Expected target for new thread") as Divert;
             divert.isThread = true;
@@ -127,17 +130,17 @@ namespace Ink
 
         protected Divert DivertIdentifierWithArguments()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             List<string> targetComponents = Parse (DotSeparatedDivertPathComponents);
             if (targetComponents == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var optionalArguments = Parse(ExpressionFunctionCallArguments);
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var targetPath = new Path (targetComponents);
             return new Divert (targetPath, optionalArguments);

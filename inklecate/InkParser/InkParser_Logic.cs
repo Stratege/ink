@@ -9,13 +9,13 @@ namespace Ink
         
         protected Parsed.Object LogicLine()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             if (ParseString ("~") == null) {
                 return null;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Some example lines we need to be able to distinguish between:
             // ~ temp x = 5  -- var decl + assign
@@ -25,9 +25,9 @@ namespace Ink
             // ~ f()         -- expr
             // We don't treat variable decl/assign as an expression since we don't want an assignment
             // to have a return value, or to be used in compound expressions.
-            ParseRule afterTilda = () => OneOf (ReturnStatement, TempDeclarationOrAssignment, Expression);
+            SpecificParseRule<Parsed.Object> afterTilda = () => OneOf (ReturnStatement, TempDeclarationOrAssignment, Expression);
 
-            var result = Expect(afterTilda, "expression after '~'", recoveryRule: SkipToNextLine) as Parsed.Object;
+            var result = Expect(afterTilda, "expression after '~'", recoveryRule: () => { SkipToNextLine(); return null; }) as Parsed.Object;
 
             // Parse all expressions, but tell the writer off if they did something useless like:
             //  ~ 5 + 4
@@ -68,21 +68,21 @@ namespace Ink
 
         protected Parsed.Object VariableDeclaration()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             var id = Parse (Identifier);
             if (id != "VAR")
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var varName = Expect (Identifier, "variable name") as string;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String ("="), "the '=' for an assignment of a value, e.g. '= 5' (initial values are mandatory)");
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var expr = Expect (Expression, "initial value for ") as Parsed.Expression;
             if (!(expr is Number || expr is StringExpression || expr is DivertTarget || expr is VariableReference)) {
@@ -104,21 +104,21 @@ namespace Ink
 
         protected Parsed.Object ConstDeclaration()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             var id = Parse (Identifier);
             if (id != "CONST")
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var varName = Expect (Identifier, "constant name") as string;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String ("="), "the '=' for an assignment of a value, e.g. '= 5' (initial values are mandatory)");
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var expr = Expect (Expression, "initial value for ") as Parsed.Expression;
             if (!(expr is Number || expr is DivertTarget || expr is StringExpression)) {
@@ -161,7 +161,7 @@ namespace Ink
                 return null;
             }
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             var logic = (Parsed.Object) Expect(InnerLogic, "some kind of logic, conditional or sequence within braces: { ... }");
             if (logic == null)
@@ -179,8 +179,8 @@ namespace Ink
             var leftGlue = new Parsed.Glue(new Runtime.Glue (Runtime.GlueType.Left));
             contentList.InsertContent (0, rightGlue);
             contentList.AddContent (leftGlue);
-                
-            Whitespace ();
+
+            IgnoredWhitespace();
 
             Expect (String("}"), "closing brace '}' for inline logic");
 
@@ -189,7 +189,7 @@ namespace Ink
 
         protected Parsed.Object InnerLogic()
         {
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Explicitly try the combinations of inner logic
             // that could potentially have conflicts first.
@@ -237,12 +237,14 @@ namespace Ink
                 if (result) {
 
                     // Not yet at end?
-                    if (Peek (Spaced (String ("}"))) == null)
-                        FailRule (ruleId);
+                    if (Peek(Spaced(String("}"))) == null)
+                        FailRule(ruleId);
 
                     // Full parse of content within braces
-                    else
-                        return (Parsed.Object) SucceedRule (ruleId, result);
+                    else {
+                        SucceedRule(ruleId, result);
+                        return result;
+                    }
                     
                 } else {
                     FailRule (ruleId);

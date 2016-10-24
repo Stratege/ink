@@ -7,11 +7,12 @@ namespace Ink
 	{
 		protected Choice Choice()
 		{
+            SpecificParseRule<Option<string>> optionalExcludedWhitespace = () => Option<string>.flatten(OptionalExclude(Whitespace<string>)());
             bool onceOnlyChoice = true;
-            var bullets = Interleave <string>(OptionalExclude(Whitespace), String("*") );
+            var bullets = Interleave<Option<string>,string,string>(optionalExcludedWhitespace, TryAddResultToList, String("*"), AddResultToList, (a,b) => true);
             if (bullets == null) {
 
-                bullets = Interleave <string>(OptionalExclude(Whitespace), String("+") );
+                bullets = Interleave<Option<string>, string, string>(optionalExcludedWhitespace, TryAddResultToList, String("+"), AddResultToList, (a,b) => true);
                 if (bullets == null) {
                     return null;
                 }
@@ -22,12 +23,12 @@ namespace Ink
             // Optional name for the choice
             string optionalName = Parse(BracketedName);
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Optional condition for whether the choice should be shown to the player
             Expression conditionExpr = Parse(ChoiceCondition);
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             // Ordinarily we avoid parser state variables like these, since
             // nesting would require us to store them in a stack. But since you should
@@ -77,11 +78,11 @@ namespace Ink
 
             bool isDefaultChoice = startContent == null && optionOnlyContent == null;
                 
-			Whitespace ();
+			IgnoredWhitespace ();
 
             var divert =  Parse(SingleDivert);
 
-            Whitespace ();
+            IgnoredWhitespace ();
 
             // Completely empty choice?
             if (!startContent && !optionOnlyContent && !innerContent && !divert) {
@@ -121,7 +122,7 @@ namespace Ink
             
         protected Expression ChoiceCondition()
         {
-            var conditions = Interleave<Expression> (ChoiceSingleCondition, ChoiceConditionsSpace);
+            var conditions = Interleave<Expression> (ChoiceSingleCondition,() => ChoiceConditionsSpace());
             if (conditions == null)
                 return null;
             else if (conditions.Count == 1)
@@ -131,13 +132,13 @@ namespace Ink
             }
         }
     
-        protected object ChoiceConditionsSpace()
+        protected Empty ChoiceConditionsSpace()
         {
             // Both optional
             // Newline includes initial end of line whitespace
-            Newline (); 
-            Whitespace ();
-            return ParseSuccess;
+            Newline ();
+            IgnoredWhitespace();
+            return Empty.empty;
         }
 
         protected Expression ChoiceSingleCondition()
@@ -174,13 +175,13 @@ namespace Ink
 
         protected object GatherDashes()
         {
-            Whitespace ();
+            IgnoredWhitespace ();
 
             int gatherDashCount = 0;
 
             while (ParseDashNotArrow () != null) {
                 gatherDashCount++;
-                Whitespace ();
+                IgnoredWhitespace();
             }
 
             if (gatherDashCount == 0)
@@ -189,14 +190,16 @@ namespace Ink
             return gatherDashCount;
         }
 
-        protected object ParseDashNotArrow()
+        protected Empty ParseDashNotArrow()
         {
             var ruleId = BeginRule ();
 
             if (ParseString ("->") == null && ParseSingleCharacter () == '-') {
-                return SucceedRule (ruleId);
+                SucceedRule<object>(ruleId);
+                return Empty.empty;
             } else {
-                return FailRule (ruleId);
+                FailRule(ruleId);
+                return null;
             }
         }
 
@@ -205,13 +208,13 @@ namespace Ink
             if (ParseString ("(") == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             string name = Parse(Identifier);
             if (name == null)
                 return null;
 
-            Whitespace ();
+            IgnoredWhitespace();
 
             Expect (String (")"), "closing ')' for bracketed name");
 
